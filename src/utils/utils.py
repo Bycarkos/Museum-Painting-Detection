@@ -21,7 +21,22 @@ import cv2
 import copy
 import pickle
 
+def read_pickle(filepath:str) -> Any:
+    """
+    Read and deserialize a pickled object from the specified file.
 
+    Parameters:
+        filepath (str): The path to the file containing the pickled object.
+
+    Returns:
+        Any: The deserialized object from the pickled file.
+    """
+    with open(filepath, "rb") as file:
+        load_file = pickle.load(file)
+
+
+
+    return load_file
 def write_pickle(information:Any,filepath:str):
     """
     Serialize and write an object to the specified file using pickle.
@@ -103,7 +118,7 @@ def create_gaborfilter_bank(**kwargs):
 
     filters = []
     num_filters = kwargs.get("n_filters", 20)
-    ksize = kwargs.get("n_filters", 32)  # The local area to evaluate
+    ksize = kwargs.get("ksize", 32)  # The local area to evaluate
     sigma = kwargs.get("sigma",4.0)   # Larger Values produce more edges
     lambd = 10.0
     gamma = 0.5

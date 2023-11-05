@@ -1,0 +1,54 @@
+defaults:
+  - _self_
+  - descriptors: [color_descriptors]
+  - preprocessing: [background_removal]
+
+data:
+  QN: qsd2_w1
+  BBDD:
+    path: ${hydra:runtime.cwd}/data/BBDD
+    importation:
+
+      descriptors:
+        save: False
+        path: ${hydra:runtime.cwd}/data/descritptors
+
+    export:
+
+      descriptors:
+        save: True
+        path: ${hydra:runtime.cwd}/data/descritptors
+
+  QS:
+
+    path: ${hydra:runtime.cwd}/data/${data.QN}
+
+    importation:
+
+      preprocessing:
+        import_: False
+        path: ${data.QS.path}/${data.QN}.pkl
+
+      descriptors:
+        import_: True
+        path: ${hydra:runtime.cwd}/data/descritptors
+
+    export:
+
+      descriptors:
+        export_: True
+        path: ${hydra:runtime.cwd}/data/descritptors
+
+      preprocessing:
+        export_: True
+        path: ${data.QS.path}/${data.QN}_processed.pkl
+
+evaluation:
+  retrieval: True
+  masking: True
+  text: True
+  ocr: True
+
+
+
+

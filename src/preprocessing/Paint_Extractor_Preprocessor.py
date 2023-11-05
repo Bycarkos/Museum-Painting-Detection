@@ -1,5 +1,5 @@
 from preprocessing.Preprocessors import Preprocessors
-from core.Image import Image, Paint
+from core.CoreImage import Image, Paint
 from preprocessing.Color_Preprocessor import Color_Preprocessor
 from preprocessing.Noise_Extractor_Preprocessor import *
 

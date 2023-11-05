@@ -59,18 +59,18 @@ class CoreImage(object):
 
 
 
-class Paint(Image):
+class Paint(CoreImage):
 
     def __init__(self, image:np.ndarray, mask:np.ndarray):
     ## initialize data
 
         self._paint: np.ndarray = image
-        self._text_bbox: np.ndarray = None
+        self._text_bbox: np.ndarray = []
         self._mask: np.ndarray = mask
         self._paint_inference: List[List] = []
         self._paint_transforms: Dict =  {}
         self._descriptors: Dict = {}
-        self._mask_bbox = None
+        self._mask_bbox = []
 
 
     @property
