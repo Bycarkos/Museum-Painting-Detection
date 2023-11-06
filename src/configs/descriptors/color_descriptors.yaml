@@ -1,3 +1,19 @@
-## TODO GOIO
+color_descriptor:
 
-save: False
+  apply: True
+  save: True
+
+  method:
+    _target_: main.PyramidalColorDescriptor
+    layers: 4
+
+  colorspace:
+    _target_: main.Color_Preprocessor.convert2rg_chromaticity
+
+  kwargs:
+    range: [0,1]
+    bins: 12
+
+
+
+

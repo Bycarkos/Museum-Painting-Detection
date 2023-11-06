@@ -1,4 +1,4 @@
-apply: True
+apply: False
 method:
   _target_: main.GF_Paint_Extractor
   kwargs:

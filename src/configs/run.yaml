@@ -2,22 +2,25 @@ defaults:
   - _self_
   - descriptors: [color_descriptors]
   - preprocessing: [background_removal]
+  - evaluation: [default]
 
 data:
   QN: qsd2_w1
+
   BBDD:
     path: ${hydra:runtime.cwd}/data/BBDD
     importation:
 
       descriptors:
-        save: False
-        path: ${hydra:runtime.cwd}/data/descritptors
+        import_: True
+        path: ${hydra:runtime.cwd}/data/descritptors/pyramidal_rg.pkl
+
 
     export:
 
       descriptors:
         save: True
-        path: ${hydra:runtime.cwd}/data/descritptors
+        path: ${hydra:runtime.cwd}/data/descritptors/pyramidal_rg.pkl
 
   QS:
 
@@ -27,7 +30,7 @@ data:
 
       preprocessing:
         import_: False
-        path: ${data.QS.path}/${data.QN}.pkl
+        path: ${data.QS.path}/${data.QN}_processed.pkl
 
       descriptors:
         import_: True
@@ -40,15 +43,5 @@ data:
         path: ${hydra:runtime.cwd}/data/descritptors
 
       preprocessing:
-        export_: True
+        export_: False
         path: ${data.QS.path}/${data.QN}_processed.pkl
-
-evaluation:
-  retrieval: True
-  masking: True
-  text: True
-  ocr: True
-
-
-
-

@@ -31,7 +31,7 @@ class GF_Paint_Extractor(Preprocessors):
     @classmethod
     def extract(cls, Im:Type[Image], **kwargs):
         image = Im.image
-        image = Color_Preprocessor.convert2rgb(image) # image in RGB
+        #image = Color_Preprocessor.convert2rgb(image) # image in RGB
 
         if utils.estimate_noise(image) > 1:
             image = NLMeans_Noise_Preprocessor.denoise(image)
@@ -53,6 +53,7 @@ class GF_Paint_Extractor(Preprocessors):
         mask = utils.convert2image((painted - binary_image) > 254)
 
         mask = utils.apply_closing(mask, (10, 10))
+        mask = utils.apply_dilate(mask, (5,5))
 
         ## Extract Contourns (the paintings)
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

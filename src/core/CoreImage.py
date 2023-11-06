@@ -13,12 +13,12 @@ from abc import ABC
 from dataclasses import dataclass, field
 
 
-class CoreImage(object):
+class CoreImage():
 
     def __init__(self, path: Path):
         self._path = path
         self._name = os.path.basename(path).split(".")[0] # get the name of the image
-        self._image = cv2.imread(str(path))
+        self._image = cv2.cvtColor(cv2.imread(str(path)), cv2.COLOR_BGR2RGB)
         self._paintings = []
         self._image_transforms = {}
         self._mask = None
@@ -31,14 +31,11 @@ class CoreImage(object):
     def __len__(self):
         return len(self._paintings)
 
-    def img_shape(self):
-        return self._image.shape
-
     def get_mask_absolut_coordenates(self, paint:Type[Paint]):
         pass
 
     def create_mask(self):
-        mask = np.zeros(self.img_shape()[:2])
+        mask = np.zeros(self.image.shape[:2])
 
         for paint in self._paintings:
             bbox = paint._mask_bbox
@@ -67,7 +64,7 @@ class Paint(CoreImage):
         self._paint: np.ndarray = image
         self._text_bbox: np.ndarray = []
         self._mask: np.ndarray = mask
-        self._paint_inference: List[List] = []
+        self._inference: Dict[List] = {"result":None, "scores":None}
         self._paint_transforms: Dict =  {}
         self._descriptors: Dict = {}
         self._mask_bbox = []
@@ -80,6 +77,11 @@ class Paint(CoreImage):
     @mask_bbox.setter
     def mask_bbox(self, bbox):
         self._mask_bbox = bbox
+
+
+    @property
+    def paint(self):
+        return self._paint
 
 
 

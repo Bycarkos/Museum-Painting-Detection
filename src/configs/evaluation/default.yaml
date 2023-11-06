@@ -1,0 +1,19 @@
+retrieval:
+  evaluate: True
+  path: ${data.QS.path}/gt_corresps.pkl
+  k: 10
+  similarity: main.histogram_intersection
+
+masking:
+  evaluate: True
+  path: ${data.QS.path}
+
+text:
+  evaluate: True
+  path: ${data.QS.path}/text_boxes.pkl
+
+ocr:
+  evaluate: True
+
+
+path: ${hydra:runtime.cwd}/results/${data.QN}
