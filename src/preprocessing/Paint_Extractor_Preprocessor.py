@@ -14,6 +14,62 @@ import cv2
 from utils import *
 
 
+def refine_mask(image):
+    # Enhancement of the external edges
+    rg_chrom = Color_Preprocessor.convert2rg_chromaticity(image)
+    enhanced = ((rg_chrom - utils.sharpening(rg_chrom)) * 255).astype("uint8")
+    enhanced = (enhanced[:, :, 0] + enhanced[:, :, 1]) // 2
+
+    ## applying the derivates (sobel)
+    edge = utils.getGradientMagnitude(enhanced, x_importance=5.5, y_importance=5.5)
+
+    thr = filters.threshold_otsu(edge)
+    edge = (edge > thr).astype(np.uint8)
+
+    ## Apply hough transform
+    mask = np.zeros_like(edge)
+    min_shape = min(edge.shape[0], edge.shape[1])
+    max_line_gap = int(min_shape * 0.02)
+    h_, w_ = edge.shape
+    votes_min_l = int(min(h_ * 0.05, w_ * 0.05))
+
+    linesP = cv2.HoughLinesP(edge, 1, np.pi / 180, votes_min_l, minLineLength=votes_min_l, maxLineGap=max_line_gap)
+
+    if linesP is not None:
+        for i in range(0, len(linesP)):
+            l = linesP[i][0]
+            cv2.line(mask, (l[0], l[1]), (l[2], l[3]), 255, 3, cv2.LINE_AA)
+
+    # Getting the contour
+    contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    decission = []
+    heigh_im, width_im = edge.shape
+
+
+    ## Getting the final bbox
+    new_mask = np.zeros_like(edge)
+
+    for contour in contours:
+        convexHull = cv2.convexHull(contour)
+
+        perimeter = cv2.arcLength(convexHull, True)
+        x, y, w, h = cv2.boundingRect(convexHull)
+        aspect_ratio = w / h
+        area = w * h
+        proportion_height = h / heigh_im
+        proportion_width = w / width_im
+
+        if (proportion_height > 0.15) and (proportion_width > 0.15) and width_im:
+            decission.append(([y, x, h, w], perimeter, area, aspect_ratio))
+
+    decission = sorted(decission, key=lambda x: x[2], reverse=True)
+    decission = utils.non_maximun_supression(decission)
+
+    new_bbox = decission[0][0]
+    y, x, h, w = new_bbox
+    new_mask[y:y + h, x:x + w] = 1
+
+    return new_bbox, new_mask
 
 class GF_Paint_Extractor(Preprocessors):
 
@@ -31,7 +87,6 @@ class GF_Paint_Extractor(Preprocessors):
     @classmethod
     def extract(cls, Im:Type[Image], **kwargs):
         image = Im.image
-        #image = Color_Preprocessor.convert2rgb(image) # image in RGB
 
         if utils.estimate_noise(image) > 1:
             image = NLMeans_Noise_Preprocessor.denoise(image)
@@ -86,5 +141,19 @@ class GF_Paint_Extractor(Preprocessors):
             paint.mask_bbox = dec[0]
             Im._paintings.append(paint)
 
+        for paint in Im._paintings:
+            final_mask = np.zeros_like(paint._mask)
+            new_bbox, new_mask = refine_mask(paint._paint)
+            old_bbox = paint._mask_bbox
 
-        pass
+            yn, xn, hn, wn = new_bbox
+            new_y =  (old_bbox[0] + new_bbox[0])
+            new_x =  (old_bbox[1] + new_bbox[1])
+            h = new_bbox[-2]
+            w = new_bbox[-1]
+
+            final_mask[new_y: new_y + h, new_x: new_x + w]
+
+            paint._paint = paint._paint[yn:yn+hn, xn:xn+wn]
+            paint._mask = final_mask
+            paint._mask_bbox = new_bbox
