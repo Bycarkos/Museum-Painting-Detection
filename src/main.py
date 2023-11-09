@@ -45,17 +45,29 @@ def main(cfg:DictConfig):
     if cfg.data.BBDD.importation.descriptors.import_ is False:
         BBDD_IMAGES_PATHS = sorted(utils.read_bbdd(Path(cfg.data.BBDD.path)))
         BBDD_DB = [CoreImage(image) for image in BBDD_IMAGES_PATHS]
-        CDescriptor_Extractor = instantiate(cfg.descriptors.color_descriptor.method)
-        kwargs = cfg.descriptors.color_descriptor.kwargs
-        colorspace = get_object(cfg.descriptors.color_descriptor.colorspace._target_)
 
-        for idx, image in tqdm(enumerate(BBDD_DB), desc="Extracting descriptors from Database"):
-            paint = image.image #Color_Preprocessor.convert2rgb(image.image)
-            paint_object = Paint(paint, mask=np.ones_like(paint))
-            image._paintings.append(paint_object)
+        if cfg.descriptors.color_descriptor.apply is True:
+            CDescriptor_Extractor = instantiate(cfg.descriptors.color_descriptor.method)
+            kwargs = cfg.descriptors.color_descriptor.kwargs
+            colorspace = get_object(cfg.descriptors.color_descriptor.colorspace._target_)
 
-            descriptor = CDescriptor_Extractor.extract(paint, colorspace=colorspace, **kwargs)
-            paint_object._descriptors["color_descriptor"] = descriptor
+            for idx, image in tqdm(enumerate(BBDD_DB), desc="Extracting descriptors from Database"):
+                paint = image.image #Color_Preprocessor.convert2rgb(image.image)
+                paint_object = Paint(paint, mask=np.ones_like(paint))
+                image._paintings.append(paint_object)
+
+                descriptor = CDescriptor_Extractor.extract(paint, colorspace=colorspace, **kwargs)
+                paint_object._descriptors["descriptor"] = descriptor
+        if cfg.descriptors.texture_descriptor.apply is True:
+            TDescriptor_Extractor = instantiate(cfg.descriptors.texture_descriptor.method)
+
+            for idx, image in tqdm(enumerate(BBDD_DB), desc="Extracting descriptors from Database"):
+                paint = image.image #Color_Preprocessor.convert2rgb(image.image)
+                paint_object = Paint(paint, mask=np.ones_like(paint))
+                image._paintings.append(paint_object)
+
+                descriptor = TDescriptor_Extractor.extract(paint)
+                paint_object._descriptors["descriptor"] = descriptor
 
         if cfg.data.BBDD.export.descriptors.save is True:
             utils.write_pickle(BBDD_DB, filepath=cfg.data.BBDD.export.descriptors.path)
@@ -111,7 +123,16 @@ def main(cfg:DictConfig):
             for paint in image._paintings:
                 image = paint._paint
                 descriptor = CDescriptor_Extractor.extract(image, colorspace=colorspace, **kwargs)
-                paint._descriptors["color_descriptor"] = descriptor
+                paint._descriptors["descriptor"] = descriptor
+    if cfg.descriptors.texture_descriptor.apply is True:
+        TDescriptor_Extractor = instantiate(cfg.descriptors.texture_descriptor.method)
+
+        for idx, image in tqdm(enumerate(QUERY_DB), desc="Extracting descriptors from QS"):
+            for paint in image._paintings:
+                image = paint._paint
+                descriptor = TDescriptor_Extractor.extract(image)
+                paint._descriptors["descriptor"] = descriptor
+
 
 
 
@@ -127,9 +148,9 @@ def main(cfg:DictConfig):
     for image_query in tqdm(QUERY_DB, desc="Creating and saving responses for the retrieval"):
         for paint in image_query._paintings:
             results=[]
-            query_descriptor = paint._descriptors["color_descriptor"]
+            query_descriptor = paint._descriptors["descriptor"]
             for idx, (image_db) in enumerate(BBDD_DB):
-                compare_descriptor = image_db[0]._descriptors["color_descriptor"]
+                compare_descriptor = image_db[0]._descriptors["descriptor"]
                 result = distance(compare_descriptor,query_descriptor)
                 results.append(tuple([result, idx]))
 

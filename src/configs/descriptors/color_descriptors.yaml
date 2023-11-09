@@ -1,6 +1,6 @@
 color_descriptor:
 
-  apply: True
+  apply: False
   save: True
 
   method:
@@ -12,7 +12,7 @@ color_descriptor:
 
   kwargs:
     range: [0,1]
-    bins: 12
+    bins: 10
 
 
 

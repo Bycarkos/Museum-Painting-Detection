@@ -1,0 +1,10 @@
+texture_descriptor:
+
+  apply: True
+  save: True
+
+  method:
+    _target_: main.DCTDescriptor
+    tiles: 2
+    coefs: 50
+    

@@ -5,7 +5,7 @@ retrieval:
   similarity: main.histogram_intersection
 
 masking:
-  evaluate: True
+  evaluate: False
   path: ${data.QS.path}
 
 text:
