@@ -1,47 +1,50 @@
 defaults:
   - _self_
-  - descriptors: [color_descriptors, texture_descriptors]
-  - preprocessing: [background_removal]
+  - descriptors: [default]
+  - preprocessing: [background_removal, text_removal]
   - evaluation: [default]
 
 data:
-  QN: qsd1_w1
 
   BBDD:
     path: ${hydra:runtime.cwd}/data/BBDD
     importation:
 
       descriptors:
-        import_: False
-        path: ${hydra:runtime.cwd}/data/descritptors/texture_dct.pkl
+        import_: True
+        path: ${hydra:runtime.cwd}/data/descritptors/pyramidal3d_rg.pkl
 
 
     export:
 
       descriptors:
-        save: True
+        save: False
         path: ${hydra:runtime.cwd}/data/descritptors/texture_dct.pkl
+
+  QN: qst1_w4
 
   QS:
-
     path: ${hydra:runtime.cwd}/data/${data.QN}
 
-    importation:
+    preprocessed:
+      import_: False
 
-      preprocessing:
-        import_: False
-        path: ${data.QS.path}/${data.QN}_processed.pkl
+    #importation:
 
-      descriptors:
-        import_: True
-        path: ${hydra:runtime.cwd}/data/descritptors
+    #   preprocessing:
+    #    import_: False
+    #    path: ${data.QS.path}/${data.QN}_processed.pkl
 
-    export:
+    #  descriptors:
+    #    import_: False
+    #    path: ${hydra:runtime.cwd}/data/descritptors
 
-      descriptors:
-        export_: True
-        path: ${hydra:runtime.cwd}/data/descritptors
+    #export:
 
-      preprocessing:
-        export_: False
-        path: ${data.QS.path}/${data.QN}_processed.pkl
+    #  descriptors:
+    #    export_: True
+    #    path: ${hydra:runtime.cwd}/data/descritptors
+
+    #  preprocessing:
+    #    export_: True
+    #    path: ${data.QS.path}/${data.QN}_processed.pkl

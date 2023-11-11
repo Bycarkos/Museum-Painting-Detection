@@ -11,20 +11,22 @@ from typing import *
 
 
 import cv2
-from utils import *
+
 
 
 def refine_mask(image):
     # Enhancement of the external edges
     rg_chrom = Color_Preprocessor.convert2rg_chromaticity(image)
-    enhanced = ((rg_chrom - utils.sharpening(rg_chrom)) * 255).astype("uint8")
+    enhanced = ((rg_chrom + utils.sharpening(rg_chrom)) * 255).astype("uint8")
     enhanced = (enhanced[:, :, 0] + enhanced[:, :, 1]) // 2
 
     ## applying the derivates (sobel)
-    edge = utils.getGradientMagnitude(enhanced, x_importance=5.5, y_importance=5.5)
+    edge = utils.Sobel_magnitude(enhanced, x_importance=6, y_importance=6)
 
     thr = filters.threshold_otsu(edge)
     edge = (edge > thr).astype(np.uint8)
+    edge = utils.apply_closing(edge, (5, 5))
+    edge = cv2.medianBlur(edge, 5)
 
     ## Apply hough transform
     mask = np.zeros_like(edge)
@@ -48,6 +50,7 @@ def refine_mask(image):
 
     ## Getting the final bbox
     new_mask = np.zeros_like(edge)
+    absolut_area = new_mask.shape[0] * new_mask.shape[1]
 
     for contour in contours:
         convexHull = cv2.convexHull(contour)
@@ -59,15 +62,21 @@ def refine_mask(image):
         proportion_height = h / heigh_im
         proportion_width = w / width_im
 
-        if (proportion_height > 0.15) and (proportion_width > 0.15) and width_im:
+        if (proportion_height > 0.15) and (proportion_width > 0.15) and width_im  and (area> absolut_area * 0.7):
             decission.append(([y, x, h, w], perimeter, area, aspect_ratio))
 
     decission = sorted(decission, key=lambda x: x[2], reverse=True)
     decission = utils.non_maximun_supression(decission)
 
-    new_bbox = decission[0][0]
-    y, x, h, w = new_bbox
-    new_mask[y:y + h, x:x + w] = 1
+    if len(decission) != 0:
+        new_bbox = decission[0][0]
+        y, x, h, w = new_bbox
+        new_mask[y:y + h, x:x + w] = 1
+
+    else:
+        new_bbox = [0,0,0,0]
+        new_mask = np.ones_like(new_mask)
+
 
     return new_bbox, new_mask
 
@@ -129,7 +138,7 @@ class GF_Paint_Extractor(Preprocessors):
                 decission.append(([y, x, h, w], perimeter, area, aspect_ratio))
 
         decission = sorted(decission, key=lambda x: x[2], reverse=True)
-        decission = utils.non_maximun_supression(decission)
+        decission = sorted(utils.non_maximun_supression(decission), key=lambda x: x[0][1])
 
         if len(decission) > 3:
             decission = decission[:3]
@@ -144,16 +153,20 @@ class GF_Paint_Extractor(Preprocessors):
         for paint in Im._paintings:
             final_mask = np.zeros_like(paint._mask)
             new_bbox, new_mask = refine_mask(paint._paint)
+
+            tmp_y, tmp_x, tmp_h, tmp_w = new_bbox
             old_bbox = paint._mask_bbox
 
-            yn, xn, hn, wn = new_bbox
-            new_y =  (old_bbox[0] + new_bbox[0])
-            new_x =  (old_bbox[1] + new_bbox[1])
-            h = new_bbox[-2]
-            w = new_bbox[-1]
+            if not tmp_y == tmp_x == tmp_h == tmp_w:
+                yn, xn, hn, wn = new_bbox
+                new_y = (old_bbox[0] + new_bbox[0])
+                new_x = (old_bbox[1] + new_bbox[1])
+                h = new_bbox[-2]
+                w = new_bbox[-1]
 
-            final_mask[new_y: new_y + h, new_x: new_x + w]
+                final_mask[new_y: new_y + h, new_x: new_x + w]
 
-            paint._paint = paint._paint[yn:yn+hn, xn:xn+wn]
-            paint._mask = final_mask
-            paint._mask_bbox = new_bbox
+                paint._paint = paint._paint[yn:yn+hn, xn:xn+wn]
+                paint._mask = final_mask
+                paint._mask_bbox = new_bbox
+

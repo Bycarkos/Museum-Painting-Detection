@@ -21,6 +21,8 @@ from core.CoreImage import *
 from utils import utils
 from utils.distance_metrics import *
 
+#pipelines
+import pipelines as pipes
 
 ## Auxiliar imports
 from pathlib import Path
@@ -36,77 +38,47 @@ from sklearn.metrics import precision_score, recall_score, f1_score
 
 
 
+
+
 # Press the green button in the gutter to run the script.
 @hydra.main(config_path="./configs", config_name="run", version_base="1.2")
 def main(cfg:DictConfig):
     print(cfg)
 
     ## BBDD
-    if cfg.data.BBDD.importation.descriptors.import_ is False:
-        BBDD_IMAGES_PATHS = sorted(utils.read_bbdd(Path(cfg.data.BBDD.path)))
-        BBDD_DB = [CoreImage(image) for image in BBDD_IMAGES_PATHS]
-
-        if cfg.descriptors.color_descriptor.apply is True:
-            CDescriptor_Extractor = instantiate(cfg.descriptors.color_descriptor.method)
-            kwargs = cfg.descriptors.color_descriptor.kwargs
-            colorspace = get_object(cfg.descriptors.color_descriptor.colorspace._target_)
-
-            for idx, image in tqdm(enumerate(BBDD_DB), desc="Extracting descriptors from Database"):
-                paint = image.image #Color_Preprocessor.convert2rgb(image.image)
-                paint_object = Paint(paint, mask=np.ones_like(paint))
-                image._paintings.append(paint_object)
-
-                descriptor = CDescriptor_Extractor.extract(paint, colorspace=colorspace, **kwargs)
-                paint_object._descriptors["descriptor"] = descriptor
-        if cfg.descriptors.texture_descriptor.apply is True:
-            TDescriptor_Extractor = instantiate(cfg.descriptors.texture_descriptor.method)
-
-            for idx, image in tqdm(enumerate(BBDD_DB), desc="Extracting descriptors from Database"):
-                paint = image.image #Color_Preprocessor.convert2rgb(image.image)
-                paint_object = Paint(paint, mask=np.ones_like(paint))
-                image._paintings.append(paint_object)
-
-                descriptor = TDescriptor_Extractor.extract(paint)
-                paint_object._descriptors["descriptor"] = descriptor
-
-        if cfg.data.BBDD.export.descriptors.save is True:
-            utils.write_pickle(BBDD_DB, filepath=cfg.data.BBDD.export.descriptors.path)
-
-
-    else:
-        BBDD_DB = utils.read_pickle(cfg.data.BBDD.importation.descriptors.path)
-
+    BBDD_DB, dic_authors = pipes.Process_BBDD(cfg)
 
     ## QS
-
     ## First part Background Removal
-    if cfg.data.QS.importation.preprocessing.import_ is True:
+    if cfg.data.QS.preprocessed.import_ is True:
         filepath = cfg.data.QS.importation.preprocessing.path
         QUERY_DB = utils.read_pickle(filepath)
 
-    ## START THE PROCESS
     else:
+        ## START THE PROCESS
         QUERY_IMAGES_PATHS = sorted(utils.read_bbdd(Path(cfg.data.QS.path)))
         QUERY_DB = [CoreImage(image) for image in QUERY_IMAGES_PATHS]
 
-        if cfg.preprocessing.apply is True:
-            paint_extractor = get_class(cfg.preprocessing.method._target_)
-            kwargs = cfg.preprocessing.method.kwargs
+        if cfg.preprocessing.background.apply is True:
+            pipes.Process_Background_Removal(cfg, QUERY_DB)
 
-            for idx, image in tqdm(enumerate(QUERY_DB), desc="Background Removal"):
-                paint_extractor.extract(image, **kwargs)
+        elif cfg.preprocessing.background.import_ is True:
+            filepath = os.path.join(cfg.data.QS.path, cfg.data.QN + "_processed.pkl")
+            QUERY_DB = utils.read_pickle(filepath)
 
-            if cfg.data.QS.export.preprocessing.export_ is True:
-                filepath = cfg.data.QS.export.preprocessing.path
-                utils.write_pickle(information=QUERY_DB, filepath=filepath)
         else:
-            for idx, image in tqdm(enumerate(QUERY_DB), desc = "Getting the images"):
+            for idx, image in tqdm(enumerate(QUERY_DB), desc="Getting the images"):
                 paint = image._image
                 paint_object = Paint(paint, mask=np.ones_like(paint))
                 image._paintings.append(paint_object)
 
+        # Second Part Text Extraction
+        if cfg.preprocessing.ocr.apply is True:
+            pipes.Process_OCR_Extraction(cfg, QUERY_DB)
 
-    ## Second Part text extraction and text detection
+        elif cfg.preprocessing.ocr.import_ is True:
+            filepath = os.path.join(cfg.data.QS.path, cfg.data.QN + "_processed.pkl")
+            QUERY_DB = utils.read_pickle(filepath)
 
 
 
@@ -114,32 +86,17 @@ def main(cfg:DictConfig):
     ## Third parth Descriptors' extraction from Query DB
 
     ## Color Descriptor
-    if cfg.descriptors.color_descriptor.apply is True:
-        CDescriptor_Extractor = instantiate(cfg.descriptors.color_descriptor.method)
-        kwargs = cfg.descriptors.color_descriptor.kwargs
-        colorspace = get_object(cfg.descriptors.color_descriptor.colorspace._target_)
-
-        for idx, image in tqdm(enumerate(QUERY_DB), desc="Extracting descriptors from QS"):
-            for paint in image._paintings:
-                image = paint._paint
-                descriptor = CDescriptor_Extractor.extract(image, colorspace=colorspace, **kwargs)
-                paint._descriptors["descriptor"] = descriptor
-    if cfg.descriptors.texture_descriptor.apply is True:
-        TDescriptor_Extractor = instantiate(cfg.descriptors.texture_descriptor.method)
-
-        for idx, image in tqdm(enumerate(QUERY_DB), desc="Extracting descriptors from QS"):
-            for paint in image._paintings:
-                image = paint._paint
-                descriptor = TDescriptor_Extractor.extract(image)
-                paint._descriptors["descriptor"] = descriptor
+    if cfg.descriptors.apply is True:
+        pipes.Process_QS_Descriptors(cfg=cfg, QUERY_DB=QUERY_DB)
 
 
 
 
 
+
+    ## TODO dema, filtrar la part dels autors com millor convengui
     ## forth parth: Retrieval and evaluation at this point all the necessary to compare is in Query_DB and BBDD_DB
     ## Creating Responses
-    ## TODO canviar això per quan hi hagi més descriptors
 
     retrieval_folder = os.path.join(cfg.evaluation.path, "retrieval")
     os.makedirs(retrieval_folder, exist_ok=True)
@@ -174,16 +131,6 @@ def main(cfg:DictConfig):
         utils.write_pickle(information=final_response, filepath=retrieval_folder+"/result.pkl")
 
 
-    ## Extracting the masks:
-    if cfg.data.QS.export.preprocessing.export_ is True:
-        masks_folder = os.path.join(cfg.evaluation.path, "masks")
-        os.makedirs(masks_folder, exist_ok=True)
-
-        for image in tqdm(QUERY_DB, desc="Saving the masks of the paintings"):
-            new_name = image._name.split(".")[0] + ".png"
-            mask = ((image.create_mask())*255).astype("uint8")
-            filepath = os.path.join(masks_folder, new_name)
-            Image.fromarray(mask).save(filepath)
 
 
 

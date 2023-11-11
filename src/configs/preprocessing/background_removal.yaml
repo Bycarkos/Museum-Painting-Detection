@@ -1,7 +1,10 @@
-apply: False
-method:
-  _target_: main.GF_Paint_Extractor
-  kwargs:
-    n_filters: 20
-    ksize: 32
-    sigma: 4.0
+background:
+  apply: False
+  import_: True
+  export_: True
+  method:
+    _target_: main.GF_Paint_Extractor
+    kwargs:
+      n_filters: 20
+      ksize: 32
+      sigma: 4.0

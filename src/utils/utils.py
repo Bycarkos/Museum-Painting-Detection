@@ -66,6 +66,36 @@ def read_bbdd(path: Type[str]) -> List[Type[Path]]:
     img_list = list(p.glob("*.jpg")) # lista [~/BBDD/bbdd_0000.jpg ...]
     return img_list
 
+
+def harmonize_tokens(text):
+    final_text = []
+    if len(text) > 0:
+        for t in text:
+            t = t.split(" ")
+            for st in t:
+                ext = [c for c in st if c.isalpha()]
+                ext = "".join(ext)
+                if len(ext) > 0:
+                    final_text.append(ext)
+    final_text = sorted(final_text)
+    final_text = " ".join(final_text)
+
+    return final_text
+
+def read_author_bbdd(path: Type[str]) -> List[Type[Path]]:
+    p = Path(path)
+    img_list = list(p.glob("*.txt")) # lista [~/BBDD/bbdd_0000.jpg ...]
+    return img_list
+
+
+def sharpening(img):
+    kernel = np.array([[0, -1, 0],
+                       [-1, 4, -1],
+                       [0, -1, 0]])
+    sharpened = cv2.filter2D(img, -1, kernel)
+
+    return sharpened
+
 def estimate_noise(img: np.ndarray):
 
     if len(img.shape) > 2:
@@ -111,6 +141,32 @@ def Sobel_magnitude(im, x_importance:float=1.5, y_importance:float=1.5):
     dyabs = cv2.convertScaleAbs(dy)
     mag = cv2.addWeighted(dxabs, x_importance, dyabs, y_importance, 0)
     return mag
+
+
+def scharr_filter(grayscale_img, sobel):
+    # set the kernel size, depending on whether we are using the Sobel
+    # operator of the Scharr operator, then compute the gradients along
+    # the x and y axis, respectively
+    # ksize = -1 if args["scharr"] > 0 else 3
+    if sobel:
+        ksize = 3
+    else:
+        ksize = -1
+
+    gX = cv2.Sobel(grayscale_img, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=ksize, delta=1)
+    gY = cv2.Sobel(grayscale_img, ddepth=cv2.CV_64F, dx=0, dy=1, ksize=ksize, delta=1)
+    # the gradient magnitude images are now of the floating point data
+    # type, so we need to take care to convert them back a to unsigned
+    # 8-bit integer representation so other OpenCV functions can operate
+    # on them and visualize them
+    gX = cv2.convertScaleAbs(gX)
+    gY = cv2.convertScaleAbs(gY)
+    # combine the gradient representations into a single image
+    combined = cv2.addWeighted(gX, 0.5, gY, 0.5, 0)
+    combined = cv2.threshold(combined, 125, 255, cv2.THRESH_BINARY)[1]
+
+    return combined
+
 
 def create_gaborfilter_bank(**kwargs):
     # This function is designed to produce a set of GaborFilters

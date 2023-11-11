@@ -62,7 +62,8 @@ class Paint(CoreImage):
     ## initialize data
 
         self._paint: np.ndarray = image
-        self._text_bbox: np.ndarray = []
+        self._text: np.ndarray = []
+        self._text_bbox = []
         self._mask: np.ndarray = mask
         self._inference: Dict[List] = {"result":None, "scores":None}
         self._paint_transforms: Dict =  {}
