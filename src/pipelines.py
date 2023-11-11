@@ -119,9 +119,10 @@ def Process_OCR_Extraction(cfg: DictConfig, QUERY_DB: List[CoreImage]):
 
 
     if cfg.preprocessing.ocr.export_ is True:
-        ocr_folder = os.path.join(cfg.evaluation.path, "ocr", "authors.txt")
+        ocr_folder = os.path.join(cfg.evaluation.path, "ocr")
+        filepath = os.path.joing(ocr_folder, "authors.txt")
         os.makedirs(ocr_folder, exist_ok=True)
-        utils.write_pickle(authors, filepath=ocr_folder)
+        utils.write_pickle(authors, filepath=filepath)
 
         filepath = os.path.join(cfg.data.QS.path, cfg.data.QN+"_processed.pkl")
         utils.write_pickle(information=QUERY_DB, filepath=filepath)
