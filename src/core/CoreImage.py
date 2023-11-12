@@ -66,6 +66,7 @@ class Paint(CoreImage):
         self._text_bbox = []
         self._mask: np.ndarray = mask
         self._inference: Dict[List] = {"result":None, "scores":None}
+        self._candidates: List = []
         self._paint_transforms: Dict =  {}
         self._descriptors: Dict = {}
         self._mask_bbox = []

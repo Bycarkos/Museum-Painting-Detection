@@ -65,80 +65,67 @@ def Process_BBDD(cfg: DictConfig):
     for idx, file in tqdm(enumerate(BBDD_AUTHORS), desc="Creating the Authors' Lookup Table"):
         with open(str(file), "r") as f:
             a = (f.readline().strip().split(","))
-            if len(a) != 0:
+            if (len(a) == 1 and a[0] == ""):
+                harmo_authors = "Unknown"
+            else:
                 a = a[0]
                 author = (a[1:].split(",")[0]).split(" ")
                 harmo_authors = utils.harmonize_tokens(author)
 
-            else:
-                harmo_authors = "Unkown"
+        if dic_authors.get(harmo_authors, None) is None:
+            dic_authors[harmo_authors] = [idx]
+        else:
+            dic_authors[harmo_authors].append(idx)
 
-        dic_authors.get(harmo_authors, []).append(idx)
 
 
     return BBDD_DB, dic_authors
 
 
 
-def Process_Background_Removal(cfg: DictConfig, QUERY_DB):
+def Process_Background_Removal(cfg: DictConfig, image: CoreImage) -> None:
 
     paint_extractor = get_class(cfg.preprocessing.background.method._target_)
     kwargs = cfg.preprocessing.background.method.kwargs
-
-    for idx, image in tqdm(enumerate(QUERY_DB), desc="Background Removal"):
-        paint_extractor.extract(image, **kwargs)
-
-    if cfg.preprocessing.background.export_ is True:
-        filepath = os.path.join(cfg.data.QS.path, cfg.data.QN+"_processed.pkl")
-        utils.write_pickle(information=QUERY_DB, filepath=filepath)
-
-        masks_folder = os.path.join(cfg.evaluation.path, "masks")
-        os.makedirs(masks_folder, exist_ok=True)
-
-        for image in tqdm(QUERY_DB, desc="Saving the masks of the paintings"):
-            new_name = image._name.split(".")[0] + ".png"
-            mask = ((image.create_mask()) * 255).astype("uint8")
-            filepath = os.path.join(masks_folder, new_name)
-            Image.fromarray(mask).save(filepath)
+    paint_extractor.extract(image, **kwargs)
 
 
-def Process_OCR_Extraction(cfg: DictConfig, QUERY_DB: List[CoreImage]):
+def Process_OCR_Extraction(cfg: DictConfig, coreimage: CoreImage):
+
     token_extractor = get_class(cfg.preprocessing.ocr.method._target_)
 
-
-    authors = []
-
-    for idx, image in tqdm(enumerate(QUERY_DB), desc="Extracting Text With the Authors from QS"):
-        local_authors = []
-        for paint in image._paintings:
-            token_extractor.extract(paint)
-            local_authors.append(paint._text)
-        authors.append(local_authors)
-
-    print(authors)
+    local_authors = []
 
 
-    if cfg.preprocessing.ocr.export_ is True:
-        ocr_folder = os.path.join(cfg.evaluation.path, "ocr")
-        filepath = os.path.joing(ocr_folder, "authors.txt")
-        os.makedirs(ocr_folder, exist_ok=True)
-        utils.write_pickle(authors, filepath=filepath)
+    for paint in coreimage._paintings:
+        text_tokens, text_bbox =  token_extractor.extract(paint._paint)
 
-        filepath = os.path.join(cfg.data.QS.path, cfg.data.QN+"_processed.pkl")
-        utils.write_pickle(information=QUERY_DB, filepath=filepath)
+        local_authors += text_tokens
+        paint._text = text_tokens
+        paint._text_bbox = text_bbox
+
+    if len(coreimage) == 1:
+        voting_text_tokens, voting_text_bbox = token_extractor.extract(coreimage._image)
+        coreimage[0]._text += voting_text_tokens
+        coreimage[0]._text_bbox += voting_text_bbox
+
+        local_authors += voting_text_tokens
+
+    return local_authors
 
 
 
 
-def Process_QS_Descriptors(cfg: DictConfig, QUERY_DB: List[CoreImage]):
+
+
+def Process_QS_Descriptors(cfg: DictConfig, coreimage: [CoreImage]) -> None:
     Descriptor_Extractor = instantiate(cfg.descriptors.method)
     kwargs = cfg.descriptors.kwargs
     colorspace = get_object(cfg.descriptors.colorspace._target_)
 
-    for idx, image in tqdm(enumerate(QUERY_DB), desc="Extracting descriptors from QS"):
-        for paint in image._paintings:
-            image = paint._paint
-            descriptor = Descriptor_Extractor.extract(image, colorspace=colorspace, **kwargs)
-            paint._descriptors["descriptor"] = descriptor
+    for paint in coreimage._paintings:
+        image = paint._paint
+        descriptor = Descriptor_Extractor.extract(image, colorspace=colorspace, **kwargs)
+        paint._descriptors["descriptor"] = descriptor
 
 

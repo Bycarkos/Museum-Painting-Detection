@@ -29,6 +29,7 @@ from pathlib import Path
 from tqdm import tqdm
 from PIL import Image
 import  matplotlib.pyplot as plt
+import  textdistance
 
 import hydra
 from hydra.utils import instantiate, get_class, get_object
@@ -47,69 +48,107 @@ def main(cfg:DictConfig):
 
     ## BBDD
     BBDD_DB, dic_authors = pipes.Process_BBDD(cfg)
+    utils.write_pickle(dic_authors, filepath="data/BBDD/authors.pkl")
 
     ## QS
     ## First part Background Removal
+
     if cfg.data.QS.preprocessed.import_ is True:
-        filepath = cfg.data.QS.importation.preprocessing.path
+        filepath = os.path.join(cfg.data.QS.path, cfg.data.QN+"_processed.pkl")
         QUERY_DB = utils.read_pickle(filepath)
 
     else:
         ## START THE PROCESS
         QUERY_IMAGES_PATHS = sorted(utils.read_bbdd(Path(cfg.data.QS.path)))
         QUERY_DB = [CoreImage(image) for image in QUERY_IMAGES_PATHS]
+        authors = []
 
-        if cfg.preprocessing.background.apply is True:
-            pipes.Process_Background_Removal(cfg, QUERY_DB)
+        for coreimage in tqdm(QUERY_DB, desc="Preprocessing Pipeline"):
 
-        elif cfg.preprocessing.background.import_ is True:
-            filepath = os.path.join(cfg.data.QS.path, cfg.data.QN + "_processed.pkl")
-            QUERY_DB = utils.read_pickle(filepath)
+            ## Background Removal
+            if cfg.preprocessing.background.apply is True:
+                print(f"STARTING BACKGROUND REMOVAL FOR IMAGE {coreimage._name}")
+                _ = pipes.Process_Background_Removal(cfg=cfg, image=coreimage)
 
-        else:
-            for idx, image in tqdm(enumerate(QUERY_DB), desc="Getting the images"):
-                paint = image._image
+            else:
+                paint = coreimage._image
                 paint_object = Paint(paint, mask=np.ones_like(paint))
-                image._paintings.append(paint_object)
+                coreimage._paintings.append(paint_object)
 
-        # Second Part Text Extraction
-        if cfg.preprocessing.ocr.apply is True:
-            pipes.Process_OCR_Extraction(cfg, QUERY_DB)
+            # Second Part Text Extraction
+            if cfg.preprocessing.ocr.apply is True:
+                print(f"EXTRACTING AUTHOR  FROM IMAGE {coreimage._name}")
 
-        elif cfg.preprocessing.ocr.import_ is True:
+                local_author = pipes.Process_OCR_Extraction(cfg, coreimage)
+
+                authors.append(local_author)
+                print(f"Response for the image {coreimage._name} with {len(coreimage)} paints: {local_author}")
+                decission = []
+                for paint in coreimage._paintings:
+                    for possible_auth in set(paint._text):
+                        for idx, author in enumerate(dic_authors.keys()):
+                            similarity = textdistance.jaccard(possible_auth, author)
+                            if similarity > 0.7:
+                                decission.append((idx, similarity))
+
+                    decission = sorted(decission, key=lambda x: x[1], reverse=True)
+                    for i in decission[:len(set(local_author))]:
+                        paint._candidates += list(dic_authors.items())[i[0]][1]
+
+            ## extract keypoints
+
+        ## SAVING THE PIPELINE
+        if cfg.data.QS.preprocessed.export_ is True:
             filepath = os.path.join(cfg.data.QS.path, cfg.data.QN + "_processed.pkl")
-            QUERY_DB = utils.read_pickle(filepath)
+            utils.write_pickle(information=QUERY_DB, filepath=filepath)
 
 
+        if cfg.preprocessing.ocr.export_ is True:
+            print("SAVING THE AUTHORS FOR EACH PAINT")
+            ocr_folder = os.path.join(cfg.evaluation.path, "ocr")
+            filepath = os.path.join(ocr_folder, "authors.pkl")
+            os.makedirs(ocr_folder, exist_ok=True)
+            utils.write_pickle(authors, filepath=filepath)
+
+        if cfg.preprocessing.background.export_ is True:
+            print("SAVING THE MASKS FROM EACH IMAGE")
+            masks_folder = os.path.join(cfg.evaluation.path, "masks")
+            os.makedirs(masks_folder, exist_ok=True)
+
+            for image in tqdm(QUERY_DB, desc="Saving the masks of the paintings"):
+                new_name = image._name.split(".")[0] + ".png"
+                mask = ((image.create_mask()) * 255).astype("uint8")
+                filepath = os.path.join(masks_folder, new_name)
+                Image.fromarray(mask).save(filepath)
 
 
-    ## Third parth Descriptors' extraction from Query DB
+    if cfg.descriptors.apply  is True:
+        for coreimage in tqdm(QUERY_DB, desc="descriptors Pipeline"):
 
-    ## Color Descriptor
-    if cfg.descriptors.apply is True:
-        pipes.Process_QS_Descriptors(cfg=cfg, QUERY_DB=QUERY_DB)
+            print(f"EXTRACTING DESCRIPTORS FOR IMAGE {coreimage._name}")
+            pipes.Process_QS_Descriptors(cfg, coreimage)
 
-
-
-
-
-
-    ## TODO dema, filtrar la part dels autors com millor convengui
     ## forth parth: Retrieval and evaluation at this point all the necessary to compare is in Query_DB and BBDD_DB
     ## Creating Responses
 
     retrieval_folder = os.path.join(cfg.evaluation.path, "retrieval")
     os.makedirs(retrieval_folder, exist_ok=True)
     distance = get_object(cfg.evaluation.retrieval.similarity)
-
     for image_query in tqdm(QUERY_DB, desc="Creating and saving responses for the retrieval"):
         for paint in image_query._paintings:
             results=[]
             query_descriptor = paint._descriptors["descriptor"]
-            for idx, (image_db) in enumerate(BBDD_DB):
-                compare_descriptor = image_db[0]._descriptors["descriptor"]
-                result = distance(compare_descriptor,query_descriptor)
-                results.append(tuple([result, idx]))
+            if len(paint._candidates) > 0:
+                for idx in paint._candidates:
+                    compare_descriptor = BBDD_DB[idx][0]._descriptors["descriptor"]
+                    result = distance(compare_descriptor, query_descriptor)
+                    results.append(tuple([result, idx]))
+
+            else:
+                for idx, (image_db) in enumerate(BBDD_DB):
+                    compare_descriptor = image_db[0]._descriptors["descriptor"]
+                    result = distance(compare_descriptor,query_descriptor)
+                    results.append(tuple([result, idx]))
 
             final = sorted(results, reverse=True)[:cfg.evaluation.retrieval.k]
 
@@ -126,14 +165,7 @@ def main(cfg:DictConfig):
             local_result += (painting._inference["result"])
 
         final_response.append(local_result)
-
-    if cfg.data.QS.export.descriptors.export_ is True:
         utils.write_pickle(information=final_response, filepath=retrieval_folder+"/result.pkl")
-
-
-
-
-
 
 
     ### Evaluation

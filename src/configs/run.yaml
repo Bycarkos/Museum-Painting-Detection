@@ -21,13 +21,16 @@ data:
         save: False
         path: ${hydra:runtime.cwd}/data/descritptors/texture_dct.pkl
 
-  QN: qst1_w4
+  QN: qsd2_w3
 
   QS:
     path: ${hydra:runtime.cwd}/data/${data.QN}
 
     preprocessed:
-      import_: False
+      import_: True
+      export_: False
+
+
 
     #importation:
 

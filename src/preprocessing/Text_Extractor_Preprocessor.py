@@ -1,5 +1,5 @@
 from preprocessing.Preprocessors import Preprocessors
-from core.CoreImage import Image, Paint
+from core.CoreImage import CoreImage, Paint
 from preprocessing.Color_Preprocessor import Color_Preprocessor
 from preprocessing.Noise_Extractor_Preprocessor import *
 
@@ -23,8 +23,8 @@ import matplotlib.pyplot as plt
 class Fourier_Token_Extractor(Preprocessors):
 
         @classmethod
-        def extract(cls, Im: Paint):
-            image = Im._paint
+        def extract(cls, image: np.ndarray):
+
             if utils.estimate_noise(image) > 1:
                 image = NLMeans_Noise_Preprocessor.denoise(image)
 
@@ -87,12 +87,14 @@ class Fourier_Token_Extractor(Preprocessors):
                 perimeter = cv2.arcLength(convexHull, True)
 
                 # if w > h:
-                constrain_1 = (final_mask.shape[0] // 30 < y) and (28 * final_mask.shape[0] // 30 > y)
-                constrain_2 = (7 * final_mask.shape[0] // 10 < y) and (final_mask.shape[0] > y)
-                if constrain_1 or constrain_2:
-                    decission.append(([y, x, h, w], area, perimeter, aspect_ratio))
+                #constrain_1 = (final_mask.shape[0] // 30 < y) and (10 * final_mask.shape[0] // 30 > y)
+                #constrain_2 = (7 * final_mask.shape[0] // 10 < y) and (final_mask.shape[0] > y)
+                #if constrain_1 or constrain_2:
+                decission.append(([y, x, h, w], area, perimeter, aspect_ratio))
 
             decission = sorted(decission, key=lambda x: x[2], reverse=True)
+            if len(decission) == 0:
+                return ["None", "None"], [[-1,-1,-1,-1], [-1,-1,-1,-1]]
 
             ## merge all bbox aligned over same axis
             final_mask_2 = np.zeros_like(final_mask)
@@ -170,6 +172,5 @@ class Fourier_Token_Extractor(Preprocessors):
                 easy_decission = [-1, -1, -1, -1]
                 easy_text = None
 
+            return [text_tokens, easy_text], [final_decission, easy_decission]
 
-            Im._text = (text_tokens, easy_text)
-            Im._text_bbox = [final_decission, easy_decission]

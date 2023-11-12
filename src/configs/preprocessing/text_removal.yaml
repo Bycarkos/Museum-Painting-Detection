@@ -1,6 +1,6 @@
 ocr:
   apply: True
-  export_: True
+  export_: False
   import_ : False
   method:
     _target_: main.Fourier_Token_Extractor

@@ -1,7 +1,7 @@
 background:
   apply: False
   import_: True
-  export_: True
+  export_: False
   method:
     _target_: main.GF_Paint_Extractor
     kwargs:

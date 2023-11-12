@@ -9,12 +9,12 @@ masking:
   path: ${data.QS.path}
 
 text:
-  evaluate: True
+  evaluate: False
   path: ${data.QS.path}/text_boxes.pkl
 
 ocr:
   evaluate: True
-  path: ${data.QS.path}/text.pkl
+  path: ${data.QS.path}
 
 
 path: ${hydra:runtime.cwd}/results/${data.QN}

@@ -114,7 +114,7 @@ class GF_Paint_Extractor(Preprocessors):
 
         painted = cls.paint_bfs(binary_image)
 
-        mask = utils.convert2image((painted - binary_image) > 254)
+        mask = utils.convert2image((painted - binary_image))
 
         mask = utils.apply_closing(mask, (10, 10))
         mask = utils.apply_dilate(mask, (5,5))
