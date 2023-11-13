@@ -11,24 +11,25 @@ data:
     importation:
 
       descriptors:
-        import_: True
-        path: ${hydra:runtime.cwd}/data/descritptors/pyramidal3d_rg.pkl
+        import_: False
+        path: ${hydra:runtime.cwd}/data/descritptors/pyramidal_yuv.pkl
 
 
     export:
 
       descriptors:
-        save: False
-        path: ${hydra:runtime.cwd}/data/descritptors/texture_dct.pkl
+        save: True
+        path: ${hydra:runtime.cwd}/data/descritptors/pyramidal_yuv.pkl
 
-  QN: qsd2_w3
+  QN: qsd1_w4
+
 
   QS:
     path: ${hydra:runtime.cwd}/data/${data.QN}
 
     preprocessed:
       import_: True
-      export_: False
+      export_: True
 
 
 

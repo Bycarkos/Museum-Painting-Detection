@@ -300,6 +300,7 @@ def apk(actual, predicted, k=10):
             The average precision at k over the input lists
 
     """
+
     if len(predicted)>k:
         predicted = predicted[:k]
 

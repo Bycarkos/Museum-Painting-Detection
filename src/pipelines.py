@@ -12,7 +12,7 @@ from preprocessing.Text_Extractor_Preprocessor import *
 from descriptors.Color_Descriptors import *
 from descriptors.Text_Descriptors import *
 from descriptors.Texture_Descriptors import *
-from descriptors.Filtering_Descriptors import *
+from descriptors.Local_Descriptors import *
 
 #CORE
 from core.CoreImage import *

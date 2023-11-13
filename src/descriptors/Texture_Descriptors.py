@@ -190,7 +190,7 @@ class DCTDescriptor(FeatureExtractors):
         return feature
 
 
-    def extract(self, img: CoreImage) -> Dict[str, np.ndarray]:
+    def extract(self, img: CoreImage, colorspace, **kwargs) -> Dict[str, np.ndarray]:
         feature = np.array([])
 
         feature = self.__tile_descriptor(img)

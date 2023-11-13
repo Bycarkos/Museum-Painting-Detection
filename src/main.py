@@ -12,7 +12,7 @@ from preprocessing.Text_Extractor_Preprocessor import *
 from descriptors.Color_Descriptors import *
 from descriptors.Text_Descriptors import *
 from descriptors.Texture_Descriptors import *
-from descriptors.Filtering_Descriptors import *
+from descriptors.Local_Descriptors import *
 
 #CORE
 from core.CoreImage import *
@@ -144,13 +144,14 @@ def main(cfg:DictConfig):
                     result = distance(compare_descriptor, query_descriptor)
                     results.append(tuple([result, idx]))
 
+
             else:
                 for idx, (image_db) in enumerate(BBDD_DB):
                     compare_descriptor = image_db[0]._descriptors["descriptor"]
                     result = distance(compare_descriptor,query_descriptor)
                     results.append(tuple([result, idx]))
 
-            final = sorted(results, reverse=True)[:cfg.evaluation.retrieval.k]
+            final = sorted(list(set(results)), reverse=True)[:cfg.evaluation.retrieval.k]
 
             scores, idx_result = list(zip(*final))
             paint._inference["result"] = list(idx_result)
@@ -162,9 +163,9 @@ def main(cfg:DictConfig):
     for idx, img in tqdm(enumerate(QUERY_DB), desc="Generating response for the retrieval"):
         local_result = []
         for painting in img._paintings:
-            local_result += (painting._inference["result"])
+            local_result.append(painting._inference["result"])
 
-        final_response.append(local_result)
+        final_response += (local_result)
         utils.write_pickle(information=final_response, filepath=retrieval_folder+"/result.pkl")
 
 
@@ -197,11 +198,22 @@ def main(cfg:DictConfig):
     ## Third evaluate the retrieval
     if cfg.evaluation.retrieval.evaluate is True:
         query_gt = utils.read_pickle(cfg.evaluation.retrieval.path)
+        final_query = []
+        for i in query_gt:
+            for j in i:
+                final_query.append([j])
+
         query_response = copy.copy(final_response)
         print(query_gt)
         print(query_response)
-        for k in [1, 3, 5, 10]:
-            metric[f"mapk@{str(k)}"] = utils.mapk(query_gt, query_response, k)
+        print(len(query_response))
+        print(final_query)
+        result_filetered = [(response, qgt) for response, qgt in zip(query_response, final_query) if qgt[0] != -1]
+        final_response, final_query = list(zip(*result_filetered))
+        print(final_query)
+        print(final_response)
+        for k in [1,2, 3, 5, 10]:
+            metric[f"mapk@{str(k)}"] = utils.mapk(final_query, final_response, k)
 
 
 

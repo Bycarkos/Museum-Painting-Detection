@@ -4,10 +4,11 @@ save: True
 method:
   _target_: main.PyramidalColorDescriptor
   layers: 4
+  channels: [1,2]
 
 colorspace:
-  _target_: main.Color_Preprocessor.convert2rg_chromaticity
+  _target_: main.Color_Preprocessor.convert2lab
 
 kwargs:
-  range: [0,1]
-  bins: 10
+  range: [0, 256]
+  bins: 64

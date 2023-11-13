@@ -2,7 +2,7 @@ retrieval:
   evaluate: True
   path: ${data.QS.path}/gt_corresps.pkl
   k: 10
-  similarity: main.histogram_intersection
+  similarity: main.hellkdis
 
 masking:
   evaluate: False

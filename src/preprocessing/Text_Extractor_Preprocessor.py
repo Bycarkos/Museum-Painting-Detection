@@ -51,7 +51,7 @@ class Fourier_Token_Extractor(Preprocessors):
             ## vertical filter band
             center_coordinates = (mag_ff.shape[1] // 2, mag_ff.shape[0] // 2)
 
-            axes_length = (int(mag_ff.shape[0] * 0.05), int(mag_ff.shape[1] * 0.05))
+            axes_length = (int(mag_ff.shape[0] * 0.01), int(mag_ff.shape[1] * 0.01))
 
             mask_image = np.zeros_like(mag_ff).copy()
 
