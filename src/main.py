@@ -13,16 +13,20 @@ from descriptors.Color_Descriptors import *
 from descriptors.Text_Descriptors import *
 from descriptors.Texture_Descriptors import *
 from descriptors.Local_Descriptors import *
+from descriptors.Combined_Descriptors import *
 
 #CORE
 from core.CoreImage import *
+
 
 #Utils
 from utils import utils
 from utils.distance_metrics import *
 
+
 #pipelines
 import pipelines as pipes
+import evaluate as evaluators
 
 ## Auxiliar imports
 from pathlib import Path
@@ -83,8 +87,8 @@ def main(cfg:DictConfig):
 
                 authors.append(local_author)
                 print(f"Response for the image {coreimage._name} with {len(coreimage)} paints: {local_author}")
-                decission = []
                 for paint in coreimage._paintings:
+                    decission = []
                     for possible_auth in set(paint._text):
                         for idx, author in enumerate(dic_authors.keys()):
                             similarity = textdistance.jaccard(possible_auth, author)
@@ -128,71 +132,69 @@ def main(cfg:DictConfig):
             print(f"EXTRACTING DESCRIPTORS FOR IMAGE {coreimage._name}")
             pipes.Process_QS_Descriptors(cfg, coreimage)
 
-    ## forth parth: Retrieval and evaluation at this point all the necessary to compare is in Query_DB and BBDD_DB
-    ## Creating Responses
+        ## forth parth: Retrieval and evaluation at this point all the necessary to compare is in Query_DB and BBDD_DB
+        ## Creating Responses
 
-    retrieval_folder = os.path.join(cfg.evaluation.path, "retrieval")
-    os.makedirs(retrieval_folder, exist_ok=True)
-    distance = get_object(cfg.evaluation.retrieval.similarity)
-    for image_query in tqdm(QUERY_DB, desc="Creating and saving responses for the retrieval"):
-        for paint in image_query._paintings:
-            results=[]
-            query_descriptor = paint._descriptors["descriptor"]
-            if len(paint._candidates) > 0:
-                for idx in paint._candidates:
-                    compare_descriptor = BBDD_DB[idx][0]._descriptors["descriptor"]
-                    result = distance(compare_descriptor, query_descriptor)
-                    results.append(tuple([result, idx]))
-
-
-            else:
-                for idx, (image_db) in enumerate(BBDD_DB):
-                    compare_descriptor = image_db[0]._descriptors["descriptor"]
-                    result = distance(compare_descriptor,query_descriptor)
-                    results.append(tuple([result, idx]))
-
-            final = sorted(list(set(results)), reverse=True)[:cfg.evaluation.retrieval.k]
-
-            scores, idx_result = list(zip(*final))
-            paint._inference["result"] = list(idx_result)
-            paint._inference["scores"] = list(scores)
+        retrieval_folder = os.path.join(cfg.evaluation.path, "retrieval")
+        os.makedirs(retrieval_folder, exist_ok=True)
+        distance = get_object(cfg.evaluation.retrieval.similarity)
+        for image_query in tqdm(QUERY_DB, desc="Creating and saving responses for the retrieval"):
+            for paint in image_query._paintings:
+                results=[]
+                query_descriptor = paint._descriptors["descriptor"]
+                if len(paint._candidates) > 0:
+                    for idx in paint._candidates:
+                        compare_descriptor = BBDD_DB[idx][0]._descriptors["descriptor"]
+                        result = distance(compare_descriptor, query_descriptor)
+                        results.append(tuple([result, idx]))
 
 
-    ## Extracting the responses for the retrieval
-    final_response = []
-    for idx, img in tqdm(enumerate(QUERY_DB), desc="Generating response for the retrieval"):
-        local_result = []
-        for painting in img._paintings:
-            local_result.append(painting._inference["result"])
+                else:
+                    for idx, (image_db) in enumerate(BBDD_DB):
+                        compare_descriptor = image_db[0]._descriptors["descriptor"]
+                        result = distance(compare_descriptor,query_descriptor)
+                        results.append(tuple([result, idx]))
 
-        final_response += (local_result)
-        utils.write_pickle(information=final_response, filepath=retrieval_folder+"/result.pkl")
+                final = sorted(list(set(results)), reverse=True)[:cfg.evaluation.retrieval.k]
 
+                scores, idx_result = list(zip(*final))
+                paint._inference["result"] = list(idx_result)
+                paint._inference["scores"] = list(scores)
+
+
+        ## Extracting the responses for the retrieval
+        final_response = []
+        for idx, img in tqdm(enumerate(QUERY_DB), desc="Generating response for the retrieval"):
+            local_result = []
+            for painting in img._paintings:
+                local_result.append(painting._inference["result"])
+
+            final_response += (local_result)
+            utils.write_pickle(information=final_response, filepath=retrieval_folder+"/result.pkl")
 
     ### Evaluation
     metric = {}
     ## First Evaluate the background Removal
     if cfg.evaluation.masking.evaluate is True:
         metric["masking"] = {}
+        metric["detection"] = {}
         p = Path(cfg.evaluation.masking.path)
         img_list = list(p.glob("*.png"))
         masks_to_compare = sorted(img_list)
-        precission = 0
-        f_score = 0
-        recall = 0
-        for idx, image in tqdm(enumerate(QUERY_DB), desc="evaluating the mask creation"):
-            mask_pred = image.create_mask().flatten()
-            mask_gt = cv2.imread(str(masks_to_compare[idx]))[:,:,0].flatten()//255
 
-            precission += precision_score(mask_pred, mask_gt)
-            recall += recall_score(mask_pred, mask_gt)
-            f_score += f1_score(mask_pred, mask_gt)
+        evaluators.evaluate_object_detection(metric_dic=metric, ground_truth=masks_to_compare, queries=QUERY_DB)
+        evaluators.evaluate_mask(metric_dic=metric, ground_truth=masks_to_compare, queries=QUERY_DB)
 
-        metric["masking"]["fscore"] = f_score/len(QUERY_DB)
-        metric["masking"]["recall"] = recall/len(QUERY_DB)
-        metric["masking"]["precission"] = precission/len(QUERY_DB)
-
+    print(metric)
     ## Second evaluate text and ocr
+    if cfg.evaluation.ocr.evaluate is True:
+        metric["ocr"] = {}
+        bbdd_idx_author = {a: idx for idx, a in enumerate(dic_authors.keys())}
+        p = Path(cfg.evaluation.ocr.path)
+        img_list = list(p.glob("*.txt"))
+        query_authors_files_gt = sorted(img_list)
+        evaluators.evaluate_ocr(metric_dic=metric, query_authors_files_gt=query_authors_files_gt,
+                                dict_bbdd_auth=bbdd_idx_author, queris=QUERY_DB)
 
 
     ## Third evaluate the retrieval

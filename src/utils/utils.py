@@ -132,11 +132,11 @@ def apply_gaborfilter_bank(img:np.ndarray, filters:List[np.ndarray]):
         np.maximum(newimage, image_filter, newimage)
     return newimage
 
-def Sobel_magnitude(im, x_importance:float=1.5, y_importance:float=1.5):
+def Sobel_magnitude(im, x_importance:float=2, y_importance:float=2):
     "Get magnitude of gradient for given image"
     ddepth = cv2.CV_64F
-    dx = cv2.Sobel(im, ddepth, 1, 0)
-    dy = cv2.Sobel(im, ddepth, 0, 1)
+    dx = cv2.Sobel(im, ddepth, 1, 0, ksize=3, scale=1)
+    dy = cv2.Sobel(im, ddepth, 0, 1, ksize=3, scale=1)
     dxabs = cv2.convertScaleAbs(dx)
     dyabs = cv2.convertScaleAbs(dy)
     mag = cv2.addWeighted(dxabs, x_importance, dyabs, y_importance, 0)
@@ -176,6 +176,9 @@ def create_gaborfilter_bank(**kwargs):
     num_filters = kwargs.get("n_filters", 20)
     ksize = kwargs.get("ksize", 32)  # The local area to evaluate
     sigma = kwargs.get("sigma",4.0)   # Larger Values produce more edges
+    print(num_filters)
+    print(ksize)
+    print(sigma)
     lambd = 10.0
     gamma = 0.5
     psi = 0  # Offset value - lower generates cleaner results

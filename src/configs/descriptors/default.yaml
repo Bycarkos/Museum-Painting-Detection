@@ -1,14 +1,16 @@
-apply: False
+apply: True
 save: True
 
 method:
-  _target_: main.PyramidalColorDescriptor
+  _target_: main.HOGPyramidal_Descriptors
   layers: 4
   channels: [1,2]
+  orientations: 32
+  cells_per_block: 3
 
 colorspace:
   _target_: main.Color_Preprocessor.convert2lab
 
 kwargs:
   range: [0, 256]
-  bins: 64
+  bins: 10

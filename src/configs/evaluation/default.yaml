@@ -1,11 +1,11 @@
 retrieval:
-  evaluate: True
+  evaluate: False
   path: ${data.QS.path}/gt_corresps.pkl
   k: 10
-  similarity: main.hellkdis
+  similarity: main.jensensim
 
 masking:
-  evaluate: False
+  evaluate: True
   path: ${data.QS.path}
 
 text:
@@ -13,7 +13,7 @@ text:
   path: ${data.QS.path}/text_boxes.pkl
 
 ocr:
-  evaluate: True
+  evaluate: False
   path: ${data.QS.path}
 
 

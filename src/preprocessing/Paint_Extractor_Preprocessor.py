@@ -9,6 +9,9 @@ import numpy as np
 from skimage import filters
 from typing import *
 
+import matplotlib.pyplot as plt
+
+
 
 import cv2
 
@@ -18,14 +21,15 @@ def refine_mask(image):
     # Enhancement of the external edges
     rg_chrom = Color_Preprocessor.convert2rg_chromaticity(image)
     enhanced = ((rg_chrom + utils.sharpening(rg_chrom)) * 255).astype("uint8")
-    enhanced = (enhanced[:, :, 0] + enhanced[:, :, 1]) // 2
+    enhanced = (enhanced[:, :, 0] + enhanced[:, :, 1]) / 2
 
     ## applying the derivates (sobel)
     edge = utils.Sobel_magnitude(enhanced, x_importance=6, y_importance=6)
 
     thr = filters.threshold_otsu(edge)
     edge = (edge > thr).astype(np.uint8)
-    edge = utils.apply_closing(edge, (5, 5))
+    k = (int(edge.shape[0] * 0.03), int(edge.shape[1] * 0.03))
+    edge = utils.apply_closing(edge, k)
     edge = cv2.medianBlur(edge, 5)
 
     ## Apply hough transform
@@ -202,17 +206,22 @@ class GF_Paint_Extractor(Preprocessors):
         image = Im.image
 
         if utils.estimate_noise(image) > 1:
+            print("gola")
             image = NLMeans_Noise_Preprocessor.denoise(image)
 
-        shaped = int(min(image.shape[0], image.shape[1]) * 0.01)
-        kwargs["ksize"] = min(kwargs["ksize"], shaped)
+        shaped = int(min(image.shape[0], image.shape[1]) * 0.03)
+        kwargs["n_filters"] = min(kwargs["ksize"], shaped)
         gabor_filters = utils.create_gaborfilter_bank(**kwargs)
         gf_image = utils.apply_gaborfilter_bank(image, gabor_filters)
         Im.add_transform("gabor_image", gf_image)
 
-        edge = utils.Sobel_magnitude(gf_image, 1.5, 1.5).mean(axis=2)
+        edge = utils.Sobel_magnitude(gf_image, 3.5, 3.5)
+        edge = cv2.cvtColor(edge, cv2.COLOR_RGB2GRAY)
+
         thresh = filters.threshold_otsu(edge)
         binary_image = utils.convert2image(edge>thresh)
+        binary_image = utils.apply_closing(binary_image, (10, 10))
+
         binary_image[0:5, :] = 0
         binary_image[:, 0:5] = 0
         binary_image[-5:, :] = 0
@@ -221,9 +230,13 @@ class GF_Paint_Extractor(Preprocessors):
         painted = cls.paint_bfs(binary_image)
 
         mask = (painted - binary_image)
-        mask = utils.apply_closing(mask, (10, 10))
-        mask = utils.apply_dilate(mask, (5,5))
-        mask = utils.convert2image(mask >250)
+        mask = utils.apply_closing(mask, (15, 5))
+        mask = utils.apply_open(mask, (1, 10))
+        mask = utils.apply_closing(mask, (20, 20))
+        mask = utils.convert2image(mask > 250)
+        mask = binary_image + mask
+        mask = cv2.medianBlur(mask, 5)
+        mask = utils.apply_open(mask, (10, 20))
 
         ## Extract Contourns (the paintings)
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -249,6 +262,9 @@ class GF_Paint_Extractor(Preprocessors):
         if len(decission) > 3:
             decission = decission[:3]
 
+        if len(decission) == 0:
+            decission.append(([0,0,mask.shape[1], mask.shape[0]], -1, -1, -1))
+
         for idx, dec in enumerate(decission):
             y, x, h, w = dec[0]
 
@@ -270,9 +286,9 @@ class GF_Paint_Extractor(Preprocessors):
                 h = new_bbox[-2]
                 w = new_bbox[-1]
 
-                final_mask[new_y: new_y + h, new_x: new_x + w]
+                final_mask[new_y: new_y + h, new_x: new_x + w] = 1
 
                 paint._paint = paint._paint[yn:yn+hn, xn:xn+wn]
                 paint._mask = final_mask
-                paint._mask_bbox = new_bbox
+                paint._mask_bbox = [new_y, new_x, h, w]
 

@@ -5,6 +5,6 @@ background:
   method:
     _target_: main.GF_Paint_Extractor
     kwargs:
-      n_filters: 20
-      ksize: 32
+      n_filters: 12
+      ksize: 8
       sigma: 4.0
